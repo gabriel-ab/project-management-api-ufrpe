@@ -111,16 +111,6 @@ def get_session():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     SQLModel.metadata.create_all(engine)
-    with Session(engine) as s:
-        user_id = UUID('3fa85f64-5717-4562-b3fc-2c963f66afa6')
-        p = Project(name='Projeto de Teste', description='Descrição de teste', user_id=user_id)
-        a = Task(name='Fazer A', description='Descrição A', status=Status.open, user_id=user_id)
-        b = Task(name='Fazer B', description='Descrição B', status=Status.open, user_id=user_id)
-        c = Task(name='Fazer C', description='Descrição C', status=Status.open, blocked=[a], user_id=user_id)
-        p.tasks.extend([a,b,c])
-        s.add(p)
-        s.commit()
-
     yield
 
 
