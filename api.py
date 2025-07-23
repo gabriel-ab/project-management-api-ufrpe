@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, APIRouter, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError, create_model
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select
+from sqlalchemy.exc import NoResultFound
 
 
 def patch(model: type[SQLModel]) -> type[SQLModel]:
@@ -55,7 +56,7 @@ class ProjectCreate(ProjectBase):
 
 
 class TaskCreate(TaskBase):
-    pass
+    dependencies: list[UUID] = Field(description="List of task IDs that this task depends on", default_factory=list)
 
 
 class ProjectPatch(patch(ProjectCreate)):
@@ -66,7 +67,7 @@ class TaskPatch(patch(TaskCreate)):
     pass
 
 
-class Project(ProjectCreate, DatabaseMixin, UserMixin, table=True):
+class Project(ProjectBase, DatabaseMixin, UserMixin, table=True):
     project_id: UUID = Field(default_factory=uuid4, primary_key=True, description="Project ID")
     tasks: list["Task"] = Relationship(back_populates="project")
 
@@ -76,7 +77,7 @@ class Dependency(SQLModel, table=True):
     blocked: UUID = Field(..., foreign_key="task.task_id", primary_key=True)
 
 
-class Task(TaskCreate, DatabaseMixin, UserMixin, table=True):
+class Task(TaskBase, DatabaseMixin, UserMixin, table=True):
     task_id: UUID = Field(default_factory=uuid4, primary_key=True, description="Task ID")
     project: Optional["Project"] = Relationship(back_populates="tasks")
     blocks: list["Task"] = Relationship(
@@ -204,11 +205,16 @@ def delete_project(user_id: UUID, project_id: UUID, session: Session = Depends(g
 @router.post("/task", response_model=Task, status_code=status.HTTP_201_CREATED)
 def create_task(user_id: UUID, task: TaskCreate, session: Session = Depends(get_session)):
     "Cria tarefa tarefas do Usuário no Projeto `project`"
-    task = Task(user_id=user_id, **task.model_dump())
-    session.add(task)
+    data = Task(user_id=user_id, **task.model_dump(exclude={"dependencies"}))
+    try:
+        deps = [session.get_one(Task, dep) for dep in task.dependencies]
+        data.blocked = deps
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="One or more dependencies not found")
+    session.add(data)
     session.commit()
-    session.refresh(task)
-    return task
+    session.refresh(data)
+    return data
 
 
 @router.get("/task", response_model=list[Task])
