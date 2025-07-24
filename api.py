@@ -5,7 +5,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 import datetime as dt
 
-from fastapi import Depends, FastAPI, HTTPException, APIRouter, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError, create_model
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select
@@ -27,6 +27,13 @@ class Status(StrEnum):
     closed = "CLOSED"
 
 
+class TeamEnum(StrEnum):
+    requirements = "REQ"
+    design = "DSN"
+    development = "DEV"
+    testing = "TEST"
+
+
 class DatabaseMixin:
     created_at: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_at: dt.datetime = Field(
@@ -34,18 +41,13 @@ class DatabaseMixin:
         sa_column_kwargs={"onupdate": dt.datetime.now},
     )
 
-
-class UserMixin(SQLModel):
-    user_id: UUID = Field(index=True, description="UUID of the user_id")
-
-
 class ProjectBase(SQLModel):
     name: str = Field(max_length=100)
     description: str = Field(max_length=500)
 
 
 class TaskBase(SQLModel):
-    project_id: UUID = Field(foreign_key="project.project_id")
+    team_id: UUID = Field(foreign_key="team.team_id")
     name: str = Field(max_length=100)
     description: str = Field(max_length=500)
     status: Status = Field(...)
@@ -67,9 +69,9 @@ class TaskPatch(patch(TaskCreate)):
     pass
 
 
-class Project(ProjectBase, DatabaseMixin, UserMixin, table=True):
-    project_id: UUID = Field(default_factory=uuid4, primary_key=True, description="Project ID")
-    tasks: list["Task"] = Relationship(back_populates="project")
+class Team(ProjectBase, DatabaseMixin, table=True):
+    team_id: UUID = Field(default_factory=uuid4, primary_key=True, description="Team ID")
+    tasks: list["Task"] = Relationship(back_populates="team")
 
 
 class Dependency(SQLModel, table=True):
@@ -77,9 +79,9 @@ class Dependency(SQLModel, table=True):
     blocked: UUID = Field(..., foreign_key="task.task_id", primary_key=True)
 
 
-class Task(TaskBase, DatabaseMixin, UserMixin, table=True):
+class Task(TaskBase, DatabaseMixin, table=True):
     task_id: UUID = Field(default_factory=uuid4, primary_key=True, description="Task ID")
-    project: Optional["Project"] = Relationship(back_populates="tasks")
+    team: Optional["Team"] = Relationship(back_populates="tasks")
     blocks: list["Task"] = Relationship(
         back_populates="blocked",
         link_model=Dependency,
@@ -116,8 +118,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Project Management API",
-    description="API for managing projects and tasks",
+    title="Team Management API",
+    description="API for managing teams and tasks",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -156,56 +158,55 @@ def would_create_cycle(session: Session, source_id: UUID, target_id: UUID) -> bo
 
     return dfs(target_id)
 
-router = APIRouter(prefix='/{user_id}')
 
-@router.post("/project", response_model=Project, status_code=status.HTTP_201_CREATED)
-def create_project(user_id: UUID, project: ProjectCreate, session: Session = Depends(get_session)):
+@app.post("/team", response_model=Team, status_code=status.HTTP_201_CREATED)
+def create_team(team: ProjectCreate, session: Session = Depends(get_session)):
     "Cria projeto do Usuário"
-    project = Project(user_id=user_id, **project.model_dump())
-    session.add(project)
+    team = Team(**team.model_dump())
+    session.add(team)
     session.commit()
-    session.refresh(project)
-    return project
+    session.refresh(team)
+    return team
 
 
-@router.get("/project", response_model=list[Project])
-def read_projects(user_id: UUID, session: Session = Depends(get_session)):
+@app.get("/team", response_model=list[Team])
+def read_teams(session: Session = Depends(get_session)):
     "Obtém projetos do Usuário"
-    project = session.exec(select(Project).where(Project.user_id == user_id)).all()
-    return project
+    team = session.exec(select(Team)).all()
+    return team
 
 
-@router.patch("/project/{project_id}", response_model=Project)
-def update_project(user_id: UUID, project_id: UUID, payment_update: ProjectPatch, session: Session = Depends(get_session)):
+@app.patch("/team/{team_id}", response_model=Team)
+def update_team(team_id: UUID, payment_update: ProjectPatch, session: Session = Depends(get_session)):
     "Atualiza projeto do Usuário"
-    project = session.get(Project, project_id)
-    if not project or project.user_id != user_id:
-        raise HTTPException(status_code=404, detail="Project not found")
+    team = session.get(Team, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
     try:
         for key, value in payment_update.model_dump(exclude_unset=True, exclude_none=True).items():
-            setattr(project, key, value)
+            setattr(team, key, value)
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    session.add(project)
+    session.add(team)
     session.commit()
-    session.refresh(project)
-    return project
+    session.refresh(team)
+    return team
 
 
-@router.delete("/project/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(user_id: UUID, project_id: UUID, session: Session = Depends(get_session)):
+@app.delete("/team/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_team(team_id: UUID, session: Session = Depends(get_session)):
     "Apaga projeto do Usuário"
-    project = session.get(Project, project_id)
-    if not project or project.user_id != user_id:
-        raise HTTPException(status_code=404, detail="Project not found")
-    session.delete(project)
+    team = session.get(Team, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    session.delete(team)
     session.commit()
 
 
-@router.post("/task", response_model=Task, status_code=status.HTTP_201_CREATED)
-def create_task(user_id: UUID, task: TaskCreate, session: Session = Depends(get_session)):
-    "Cria tarefa tarefas do Usuário no Projeto `project`"
-    data = Task(user_id=user_id, **task.model_dump(exclude={"dependencies"}))
+@app.post("/task", response_model=Task, status_code=status.HTTP_201_CREATED)
+def create_task(task: TaskCreate, session: Session = Depends(get_session)):
+    "Cria tarefa tarefas do Usuário no Projeto `team`"
+    data = Task(**task.model_dump(exclude={"dependencies"}))
     try:
         deps = [session.get_one(Task, dep) for dep in task.dependencies]
         data.blocked = deps
@@ -217,18 +218,18 @@ def create_task(user_id: UUID, task: TaskCreate, session: Session = Depends(get_
     return data
 
 
-@router.get("/task", response_model=list[Task])
-def read_tasks(user_id: UUID, project: UUID, session: Session = Depends(get_session)):
-    "Obtém tarefas do Usuário no Projeto `project`"
-    tasks = session.exec(select(Task).where(Task.user_id == user_id, Task.project_id == project)).all()
+@app.get("/task", response_model=list[Task])
+def read_tasks(team: UUID, session: Session = Depends(get_session)):
+    "Obtém tarefas do Usuário no Projeto `team`"
+    tasks = session.exec(select(Task).where(Task.team_id == team)).all()
     return tasks
 
 
-@router.patch("/task/{task_id}", response_model=Task)
-def update_task(user_id: UUID, task_id: UUID, task_update: TaskPatch, session: Session = Depends(get_session)):
+@app.patch("/task/{task_id}", response_model=Task)
+def update_task(task_id: UUID, task_update: TaskPatch, session: Session = Depends(get_session)):
     "Atualiza tarefa do Usuário"
     task = session.get(Task, task_id)
-    if not task or task.user_id != user_id:
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     try:
         for key, value in task_update.model_dump(exclude_unset=True, exclude_none=True).items():
@@ -241,22 +242,22 @@ def update_task(user_id: UUID, task_id: UUID, task_update: TaskPatch, session: S
     return task
 
 
-@router.delete("/task/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(user_id: UUID, task_id: UUID, session: Session = Depends(get_session)):
+@app.delete("/task/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(task_id: UUID, session: Session = Depends(get_session)):
     "Apaga tarefa do Usuário"
     task = session.get(Task, task_id)
-    if not task or task.user_id != user_id:
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     session.delete(task)
     session.commit()
 
 
-@router.post("/task/{task_id}/blocks")
-def block_task(user_id: UUID, task_id: UUID, target: UUID, session: Session = Depends(get_session)):
+@app.post("/task/{task_id}/depends/{target}", status_code=status.HTTP_201_CREATED)
+def block_task(task_id: UUID, target: UUID, session: Session = Depends(get_session)):
     "Adiciona a tarefa `uuid` como pre requisito para a tarefa `target_id`"
 
     task = session.get(Task, task_id)
-    if not task or task.user_id != user_id:
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     if task_id == target:
@@ -265,27 +266,25 @@ def block_task(user_id: UUID, task_id: UUID, target: UUID, session: Session = De
     if would_create_cycle(session, task_id, target):
         raise HTTPException(status_code=400, detail="This dependency would create a cycle.")
 
-    dependency = Dependency(blocks=task_id, blocked=target)
+    dependency = Dependency(blocks=target, blocked=task_id)
     session.add(dependency)
     session.commit()
 
 
-@router.get("/task/{task_id}/blocks", response_model=list[Task])
-def list_tasks_which_are_blocked_by_this_task(user_id: UUID, task_id: UUID, session: Session = Depends(get_session)):
+@app.get("/task/{task_id}/blocks", response_model=list[Task])
+def list_tasks_which_are_blocked_by_this_task(task_id: UUID, session: Session = Depends(get_session)):
     "Lista as tarefas que só serão feitas após esta"
     task = session.get(Task, task_id)
-    if not task or task.user_id != user_id:
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task.blocks
 
 
-@router.get("/task/{task_id}/blocked", response_model=list[Task])
-def list_tasks_which_this_task_depends_on(user_id: UUID, task_id: UUID, session: Session = Depends(get_session)):
+@app.get("/task/{task_id}/depends", response_model=list[Task])
+def list_tasks_which_this_task_depends_on(task_id: UUID, session: Session = Depends(get_session)):
     "Lista as tarefas que devem ser feitas antes desta"
     task = session.get(Task, task_id)
-    if not task or task.user_id != user_id:
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task.blocked
 
-
-app.include_router(router)
