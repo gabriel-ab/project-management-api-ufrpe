@@ -41,6 +41,7 @@ class DatabaseMixin:
         sa_column_kwargs={"onupdate": dt.datetime.now},
     )
 
+
 class ProjectBase(SQLModel):
     name: str = Field(max_length=100)
     description: str = Field(max_length=500)
@@ -86,10 +87,10 @@ class Task(TaskBase, DatabaseMixin, table=True):
         back_populates="blocked",
         link_model=Dependency,
         sa_relationship_kwargs=dict(
-            foreign_keys=[Dependency.blocks,Dependency.blocked],
+            foreign_keys=[Dependency.blocks, Dependency.blocked],
             primaryjoin="Task.task_id==Dependency.blocks",
             secondaryjoin="Task.task_id==Dependency.blocked",
-        )
+        ),
     )
     blocked: list["Task"] = Relationship(
         back_populates="blocks",
@@ -97,8 +98,8 @@ class Task(TaskBase, DatabaseMixin, table=True):
         sa_relationship_kwargs=dict(
             foreign_keys=[Dependency.blocked, Dependency.blocks],
             primaryjoin="Task.task_id == Dependency.blocked",
-            secondaryjoin="Task.task_id == Dependency.blocks"
-        )
+            secondaryjoin="Task.task_id == Dependency.blocks",
+        ),
     )
 
 
@@ -252,34 +253,6 @@ def delete_task(task_id: UUID, session: Session = Depends(get_session)):
     session.commit()
 
 
-@app.post("/task/{task_id}/depends/{target}", status_code=status.HTTP_201_CREATED)
-def block_task(task_id: UUID, target: UUID, session: Session = Depends(get_session)):
-    "Adiciona a tarefa `uuid` como pre requisito para a tarefa `target_id`"
-
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    if task_id == target:
-        raise HTTPException(status_code=400, detail="A task cannot depend on itself.")
-
-    if would_create_cycle(session, task_id, target):
-        raise HTTPException(status_code=400, detail="This dependency would create a cycle.")
-
-    dependency = Dependency(blocks=target, blocked=task_id)
-    session.add(dependency)
-    session.commit()
-
-
-@app.get("/task/{task_id}/blocks", response_model=list[Task])
-def list_tasks_which_are_blocked_by_this_task(task_id: UUID, session: Session = Depends(get_session)):
-    "Lista as tarefas que só serão feitas após esta"
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task.blocks
-
-
 @app.get("/task/{task_id}/depends", response_model=list[Task])
 def list_tasks_which_this_task_depends_on(task_id: UUID, session: Session = Depends(get_session)):
     "Lista as tarefas que devem ser feitas antes desta"
@@ -288,3 +261,41 @@ def list_tasks_which_this_task_depends_on(task_id: UUID, session: Session = Depe
         raise HTTPException(status_code=404, detail="Task not found")
     return task.blocked
 
+
+@app.post("/task/{task_id}/depends/{other_task_id}", status_code=status.HTTP_201_CREATED)
+def add_task_dependency(task_id: UUID, other_task_id: UUID, session: Session = Depends(get_session)):
+    "Adiciona a tarefa `uuid` como pre requisito para a tarefa `tarother_task_idget_id`"
+
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_id == other_task_id:
+        raise HTTPException(status_code=400, detail="A task cannot depend on itself.")
+
+    if would_create_cycle(session, task_id, other_task_id):
+        raise HTTPException(status_code=400, detail="This dependency would create a cycle.")
+
+    dependency = Dependency(blocks=other_task_id, blocked=task_id)
+    session.add(dependency)
+    session.commit()
+
+
+@app.delete("/task/{task_id}/depends/{other_task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_task_dependency(task_id: UUID, other_task_id: UUID, session: Session = Depends(get_session)):
+    """
+    Remove a dependência de `other_task_id` como pré-requisito para a tarefa `task_id`
+    """
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_id == other_task_id:
+        raise HTTPException(status_code=400, detail="A task cannot depend on itself.")
+
+    dependency = session.get(Dependency, (other_task_id, task_id))
+    if not dependency:
+        raise HTTPException(status_code=404, detail="Dependency not found")
+
+    session.delete(dependency)
+    session.commit()
