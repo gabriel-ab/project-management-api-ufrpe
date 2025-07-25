@@ -17,7 +17,13 @@ Este backend implementa uma API para gerenciamento de projetos e tarefas, utiliz
    ```bash
    fastapi run
    ```
-> Se preferir usar o docker: `docker build -t `
+2. Execute a API com dados Mockados:
+   ```bash
+   DATABASE_RESET=1 DATABASE_POPULATE=1 fastapi run
+   ```
+> Se preferir usar o docker: `docker compose up -d`
+
+O `compose.yaml` usa dados mockados automáticamente
 
 ### Testes
 Os testes automatizados estão no arquivo `test.py`.

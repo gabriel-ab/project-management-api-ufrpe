@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-from uuid import UUID
 import datetime as dt
 import os
 from enum import StrEnum
@@ -14,10 +12,11 @@ engine = create_engine(DATABASE_URL, echo=False)
 
 
 def patch(cls: type[SQLModel]) -> type[SQLModel]:
-    for f in cls.model_fields.values():
+    fields = cls.model_fields.copy()
+    for f in fields.values():
         f.required = False
         f.default = None
-    return cls
+    return create_model(f"{cls.__name__}Patch", **{n: (Optional[f.annotation], f) for n, f in fields.items()})
 
 
 def get_session():
@@ -52,7 +51,7 @@ class CaseBase(SQLModel):
 
 
 class Case(CaseBase, DatabaseMixin, table=True):
-    id: int = Field(primary_key=True, alias="case_id", description="Case ID")
+    id: int = Field(primary_key=True, schema_extra=dict(serialization_alias="case_id"), description="Case ID")
     tasks: list["Task"] = Relationship(back_populates="case", cascade_delete=True)
 
 
@@ -60,9 +59,7 @@ class CaseCreate(CaseBase):
     pass
 
 
-@patch
-class CasePatch(CaseCreate):
-    pass
+CasePatch = patch(CaseCreate)
 
 
 class TeamTaskCounter(SQLModel, table=True):
@@ -84,7 +81,7 @@ class TaskBase(SQLModel):
 
 
 class Task(TaskBase, DatabaseMixin, table=True):
-    id: int = Field(primary_key=True, alias="task_id", description="Task ID")
+    id: int = Field(primary_key=True, schema_extra=dict(serialization_alias="task_id"), description="Task ID")
     nu: int = Field(description="Task number in the team")
 
     @computed_field
@@ -107,6 +104,4 @@ class TaskCreate(TaskBase):
     dependencies: list[str] = Field(description="List of task IDs that this task depends on", default_factory=list)
 
 
-@patch
-class TaskPatch(TaskCreate):
-    pass
+TaskPatch = patch(TaskCreate)

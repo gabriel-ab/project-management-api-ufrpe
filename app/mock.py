@@ -15,7 +15,7 @@ def create_mock_data(app: FastAPI):
     for c in cases:
         resp = client.post("/case", json=c)
         resp.raise_for_status()
-        case_ids.append(resp.json()["id"])
+        case_ids.append(resp.json()["case_id"])
 
     tasks = [
         # REQ
@@ -155,7 +155,7 @@ def create_mock_data(app: FastAPI):
     for t in tasks:
         resp = client.post("/task", json=t)
         resp.raise_for_status()
-        task_ids.append(resp.json()["id"])
+        task_ids.append(resp.json()["task_id"])
 
     print("Tasks created:", task_ids)
 

@@ -117,42 +117,41 @@ def create_case(case: CaseCreate, session: Session = Depends(get_session)):
 
 
 @app.get("/case", response_model=list[Case])
-def read_cases(case_id: int = None, session: Session = Depends(get_session)):
+def read_cases(session: Session = Depends(get_session)):
     "Obtém casos de uso"
-    tasks = session.exec(select(Case)).all()
-    return tasks
+    return session.exec(select(Case)).all()
 
 
-@app.patch("/case/{case_id}", response_model=Case)
-def update_case(case_id: UUID, task_update: CasePatch, session: Session = Depends(get_session)):
-    "Atualiza tarefa do Usuário"
-    task = session.get(Case, case_id)
-    if not task:
+@app.patch("/case/{id}", response_model=Case)
+def update_case(id: int, data_update: CasePatch, session: Session = Depends(get_session)):
+    "Atualiza Caso de Uso"
+    data = session.get(Case, id)
+    if not data:
         raise HTTPException(status_code=404, detail="Case not found")
     try:
-        for key, value in task_update.model_dump(exclude_unset=True, exclude_none=True).items():
-            setattr(task, key, value)
+        for key, value in data_update.model_dump(exclude_unset=True, exclude_none=True).items():
+            setattr(data, key, value)
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    session.add(task)
+    session.add(data)
     session.commit()
-    session.refresh(task)
-    return task
+    session.refresh(data)
+    return data
 
 
-@app.delete("/case/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_case(case_id: UUID, session: Session = Depends(get_session)):
-    "Apaga tarefa do Usuário"
-    task = session.get(Case, case_id)
-    if not task:
+@app.delete("/case/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_case(id: UUID, session: Session = Depends(get_session)):
+    "Apaga Caso de Uso"
+    data = session.get(Case, id)
+    if not data:
         raise HTTPException(status_code=404, detail="Case not found")
-    session.delete(task)
+    session.delete(data)
     session.commit()
 
 
 @app.post("/task", response_model=Task, status_code=status.HTTP_201_CREATED)
 def create_task(task: TaskCreate, session: Session = Depends(get_session)):
-    "Cria tarefa tarefas do Usuário no Projeto `team`"
+    "Cria tarefa"
     nu = 1 + (session.exec(select(func.max(Task.nu)).where(Task.team == task.team)).first() or 0)
     data = Task(nu=nu, **task.model_dump(exclude={"dependencies"}))
     if task.dependencies:
