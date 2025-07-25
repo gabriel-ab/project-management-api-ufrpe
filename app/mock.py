@@ -160,25 +160,24 @@ def create_mock_data(app: FastAPI):
     print("Tasks created:", task_ids)
 
     # Dependências (índices iguais aos da lista tasks)
-    # dependencies = [
-    #     (5, 1),  # Wireframe depende de requisitos de catálogo
-    #     (6, 3),  # Protótipo do checkout depende de requisitos de carrinho
-    #     (9, 5),  # Implementar cadastro depende do wireframe
-    #     (9, 5),  # API de pedidos depende do protótipo do checkout
-    #     (11, 10),  # Integração pagamento depende da API de pedidos
-    #     (13, 9),  # Testes backend depende do cadastro de produtos
-    #     (14, 11),  # Testes integração depende da integração pagamento
-    #     (15, 8),  # Testes usabilidade depende da identidade visual
-    #     (2, 1),  # Requisitos de clientes depende de requisitos de catálogo
-    #     (3, 2),  # Requisitos de carrinho depende de requisitos de clientes
-    #     (7, 5),  # Design painel depende do wireframe
-    #     (8, 7),  # Identidade visual depende do painel admin
-    #     (12, 9),  # Cadastro usuários depende do cadastro de produtos
-    #     (16, 13),  # Testes performance depende dos testes backend
-    # ]
-    # for depender_idx, dependee_idx in dependencies:
-    #     depender_id = task_ids[depender_idx]
-    #     dependee_id = task_ids[dependee_idx]
-    #     print(f"Creating dependency: {depender_id} -> {dependee_id}")
-    #     resp = client.post(f"/task/{depender_id}/depends/{dependee_id}")
-    #     resp.raise_for_status()
+    dependencies = [
+        (4, 0),  # Wireframe depende de requisitos de catálogo
+        (5, 2),  # Protótipo do checkout depende de requisitos de carrinho
+        (8, 4),  # Implementar cadastro depende do wireframe
+        (9, 5),  # API de pedidos depende do protótipo do checkout
+        (10, 9),  # Integração pagamento depende da API de pedidos
+        (12, 8),  # Testes backend depende do cadastro de produtos
+        (13, 10),  # Testes integração depende da integração pagamento
+        (14, 7),  # Testes usabilidade depende da identidade visual
+        (1, 0),  # Requisitos de clientes depende de requisitos de catálogo
+        (2, 1),  # Requisitos de carrinho depende de requisitos de clientes
+        (6, 4),  # Design painel depende do wireframe
+        (7, 6),  # Identidade visual depende do painel admin
+        (11, 8),  # Cadastro usuários depende do cadastro de produtos
+        (15, 12),  # Testes performance depende dos testes backend
+    ]
+    for depender_idx, dependee_idx in dependencies:
+        depender_id = task_ids[depender_idx]
+        dependee_id = task_ids[dependee_idx]
+        resp = client.post(f"/task/{depender_id}/depends/{dependee_id}")
+        resp.raise_for_status()
