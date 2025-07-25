@@ -18,6 +18,7 @@ from .db import (
     Task,
     TaskCreate,
     TaskPatch,
+    TaskWithDependencies,
     TeamEnum,
     engine,
     get_session,
@@ -156,7 +157,7 @@ def create_task(task: TaskCreate, session: Session = Depends(get_session)):
     data = Task(nu=nu, **task.model_dump(exclude={"dependencies"}))
     if task.dependencies:
         try:
-            data.depends = session.exec(select(Task).where(Task.id.in_(task.dependencies))).all()
+            data.dependencies = session.exec(select(Task).where(Task.id.in_(task.dependencies))).all()
         except NoResultFound:
             raise HTTPException(status_code=404, detail="One or more dependencies not found")
     session.add(data)
@@ -168,6 +169,16 @@ def create_task(task: TaskCreate, session: Session = Depends(get_session)):
 @app.get("/task", response_model=list[Task])
 def read_tasks(team: TeamEnum = None, case_id: int = None, session: Session = Depends(get_session)):
     "Obtém tarefas"
+    query = select(Task)
+    if team is not None:
+        query = query.where(Task.team == team)
+    if case_id is not None:
+        query = query.where(Task.case_id == case_id)
+    return session.exec(query).all()
+
+@app.get("/task-with-deps", response_model=list[TaskWithDependencies])
+def read_tasks_with_dependencies(team: TeamEnum = None, case_id: int = None, session: Session = Depends(get_session)):
+    "Obtém tarefas e suas dependências"
     query = select(Task)
     if team is not None:
         query = query.where(Task.team == team)
@@ -209,7 +220,7 @@ def delete_task(id: CodeOrID, session: Session = Depends(get_session)):
 def list_tasks_which_this_task_depends_on(id: CodeOrID, session: Session = Depends(get_session)):
     "Lista as tarefas que devem ser feitas antes desta"
     task = get_task_by_code_or_id(session, id)
-    return task.depends
+    return task.dependencies
 
 
 @app.post("/task/{task_a}/depends/{task_b}", status_code=status.HTTP_201_CREATED)

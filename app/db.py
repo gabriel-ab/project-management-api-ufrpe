@@ -79,8 +79,7 @@ class TaskBase(SQLModel):
     status: StatusEnum = Field(...)
     team: TeamEnum = Field(default=TeamEnum.development, description="Team responsible for the task")
 
-
-class Task(TaskBase, DatabaseMixin, table=True):
+class TaskPublic(TaskBase, DatabaseMixin):
     id: int = Field(primary_key=True, schema_extra=dict(serialization_alias="task_id"), description="Task ID")
     nu: int = Field(description="Task number in the team")
 
@@ -89,8 +88,9 @@ class Task(TaskBase, DatabaseMixin, table=True):
     def code(self) -> str:
         return f"{self.team}-{self.nu}"
 
+class Task(TaskPublic, table=True):
     case: Case = Relationship(back_populates="tasks")
-    depends: list["Task"] = Relationship(
+    dependencies: list["Task"] = Relationship(
         link_model=Dependency,
         sa_relationship_kwargs=dict(
             foreign_keys=[Dependency.blocked, Dependency.blocks],
@@ -105,3 +105,9 @@ class TaskCreate(TaskBase):
 
 
 TaskPatch = patch(TaskCreate)
+
+class TaskWithDependencies(TaskPublic):
+    dependencies: list[Task] = Field(
+        default_factory=list,
+        description="List of tasks that this task depends on",
+    )
