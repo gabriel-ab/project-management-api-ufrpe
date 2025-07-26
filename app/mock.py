@@ -24,7 +24,6 @@ def create_mock_data(app: FastAPI):
             "description": "Mapear atributos necessários para produtos",
             "team": "REQ",
             "case_id": case_ids[0],
-            "nu": 1,
             "status": "OPEN",
         },
         {
@@ -32,7 +31,6 @@ def create_mock_data(app: FastAPI):
             "description": "Definir dados obrigatórios para clientes",
             "team": "REQ",
             "case_id": case_ids[1],
-            "nu": 2,
             "status": "OPEN",
         },
         {
@@ -40,7 +38,6 @@ def create_mock_data(app: FastAPI):
             "description": "Detalhar regras do carrinho",
             "team": "REQ",
             "case_id": case_ids[1],
-            "nu": 3,
             "status": "OPEN",
         },
         {
@@ -48,7 +45,6 @@ def create_mock_data(app: FastAPI):
             "description": "Especificar regras de descontos e cupons",
             "team": "REQ",
             "case_id": case_ids[0],
-            "nu": 4,
             "status": "OPEN",
         },
         # DES
@@ -57,32 +53,32 @@ def create_mock_data(app: FastAPI):
             "description": "Desenhar layout para exibição de produtos",
             "team": "DES",
             "case_id": case_ids[0],
-            "nu": 1,
             "status": "OPEN",
+            "dependencies": ["REQ-1", "REQ-4"],
         },
         {
             "name": "Protótipo do checkout",
             "description": "Criar protótipo navegável do fluxo de compra",
             "team": "DES",
             "case_id": case_ids[1],
-            "nu": 2,
             "status": "OPEN",
+            "dependencies": ["REQ-2", "REQ-3"],
         },
         {
             "name": "Design do painel administrativo",
             "description": "Interface para gestão de produtos e pedidos",
             "team": "DES",
             "case_id": case_ids[0],
-            "nu": 3,
             "status": "OPEN",
+            "dependencies": ["REQ-1"],
         },
         {
             "name": "Identidade visual do e-commerce",
             "description": "Definir paleta de cores e tipografia",
             "team": "DES",
             "case_id": case_ids[0],
-            "nu": 4,
             "status": "OPEN",
+            "dependencies": ["REQ-1", "DES-1"],
         },
         # DEV
         {
@@ -90,32 +86,32 @@ def create_mock_data(app: FastAPI):
             "description": "CRUD de produtos com imagens",
             "team": "DEV",
             "case_id": case_ids[0],
-            "nu": 1,
             "status": "OPEN",
+            "dependencies": ["DES-1"],
         },
         {
             "name": "API de pedidos",
             "description": "Endpoints para criação e consulta de pedidos",
             "team": "DEV",
             "case_id": case_ids[1],
-            "nu": 2,
             "status": "OPEN",
+            "dependencies": ["DES-1", "DES-2"],
         },
         {
             "name": "Integração com gateway de pagamento",
             "description": "Processar pagamentos online",
             "team": "DEV",
             "case_id": case_ids[1],
-            "nu": 3,
             "status": "OPEN",
+            "dependencies": ["REQ-3", "DES-3"],
         },
         {
             "name": "Cadastro de usuários",
             "description": "Permitir registro e autenticação de clientes",
             "team": "DEV",
             "case_id": case_ids[1],
-            "nu": 4,
             "status": "OPEN",
+            "dependencies": ["REQ-2", "DES-3"],
         },
         # TES
         {
@@ -123,23 +119,22 @@ def create_mock_data(app: FastAPI):
             "description": "Cobrir regras de negócio com testes automatizados",
             "team": "TES",
             "case_id": case_ids[0],
-            "nu": 1,
             "status": "OPEN",
+            "dependencies": ["DEV-2", "DEV-4"],
         },
         {
             "name": "Testes de integração do checkout",
             "description": "Validar fluxo completo de compra",
             "team": "TES",
             "case_id": case_ids[1],
-            "nu": 2,
             "status": "OPEN",
+            "dependencies": ["DEV-3"],
         },
         {
             "name": "Testes de usabilidade",
             "description": "Avaliar experiência do usuário no site",
             "team": "TES",
             "case_id": case_ids[0],
-            "nu": 3,
             "status": "OPEN",
         },
         {
@@ -147,7 +142,6 @@ def create_mock_data(app: FastAPI):
             "description": "Medir tempo de resposta do sistema",
             "team": "TES",
             "case_id": case_ids[1],
-            "nu": 4,
             "status": "OPEN",
         },
     ]
@@ -159,25 +153,5 @@ def create_mock_data(app: FastAPI):
 
     print("Tasks created:", task_ids)
 
-    # Dependências (índices iguais aos da lista tasks)
-    dependencies = [
-        (4, 0),  # Wireframe depende de requisitos de catálogo
-        (5, 2),  # Protótipo do checkout depende de requisitos de carrinho
-        (8, 4),  # Implementar cadastro depende do wireframe
-        (9, 5),  # API de pedidos depende do protótipo do checkout
-        (10, 9),  # Integração pagamento depende da API de pedidos
-        (12, 8),  # Testes backend depende do cadastro de produtos
-        (13, 10),  # Testes integração depende da integração pagamento
-        (14, 7),  # Testes usabilidade depende da identidade visual
-        (1, 0),  # Requisitos de clientes depende de requisitos de catálogo
-        (2, 1),  # Requisitos de carrinho depende de requisitos de clientes
-        (6, 4),  # Design painel depende do wireframe
-        (7, 6),  # Identidade visual depende do painel admin
-        (11, 8),  # Cadastro usuários depende do cadastro de produtos
-        (15, 12),  # Testes performance depende dos testes backend
-    ]
-    for depender_idx, dependee_idx in dependencies:
-        depender_id = task_ids[depender_idx]
-        dependee_id = task_ids[dependee_idx]
-        resp = client.post(f"/task/{depender_id}/depends/{dependee_id}")
-        resp.raise_for_status()
+    resp = client.post("/task/TES-4/depends/DEV-4")
+    resp.raise_for_status()

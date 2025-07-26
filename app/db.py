@@ -1,10 +1,15 @@
 import datetime as dt
 import os
 from enum import StrEnum
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import computed_field, create_model
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
+from fastapi import Path
+
+CodeOrID = Annotated[
+    str, Path(..., pattern=r"(REQ|DES|DEV|TES)-\d+$|^\d+", description="Task code (e.g., DEV-1) or ID (e.g., 1)")
+]
 
 # DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///:memory:")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./database.db")
@@ -79,6 +84,7 @@ class TaskBase(SQLModel):
     status: StatusEnum = Field(...)
     team: TeamEnum = Field(default=TeamEnum.development, description="Team responsible for the task")
 
+
 class TaskPublic(TaskBase, DatabaseMixin):
     id: int = Field(primary_key=True, schema_extra=dict(serialization_alias="task_id"), description="Task ID")
     nu: int = Field(description="Task number in the team")
@@ -87,6 +93,7 @@ class TaskPublic(TaskBase, DatabaseMixin):
     @property
     def code(self) -> str:
         return f"{self.team}-{self.nu}"
+
 
 class Task(TaskPublic, table=True):
     case: Case = Relationship(back_populates="tasks")
@@ -101,10 +108,11 @@ class Task(TaskPublic, table=True):
 
 
 class TaskCreate(TaskBase):
-    dependencies: list[str] = Field(description="List of task IDs that this task depends on", default_factory=list)
+    dependencies: list[CodeOrID] = Field(description="List of task IDs that this task depends on", default_factory=list)
 
 
 TaskPatch = patch(TaskCreate)
+
 
 class TaskWithDependencies(TaskPublic):
     dependencies: list[Task] = Field(

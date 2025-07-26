@@ -1,9 +1,8 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Path, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from sqlalchemy import func
@@ -11,6 +10,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, SQLModel, select
 
 from .db import (
+    CodeOrID,
     Case,
     CaseCreate,
     CasePatch,
@@ -23,10 +23,6 @@ from .db import (
     engine,
     get_session,
 )
-
-CodeOrID = Annotated[
-    str, Path(..., pattern=r"(REQ|DES|DEV|TES)-\d+$|^\d+", description="Task code (e.g., DEV-1) or ID (e.g., 1)")
-]
 
 
 @asynccontextmanager
@@ -157,7 +153,7 @@ def create_task(task: TaskCreate, session: Session = Depends(get_session)):
     data = Task(nu=nu, **task.model_dump(exclude={"dependencies"}))
     if task.dependencies:
         try:
-            data.dependencies = session.exec(select(Task).where(Task.id.in_(task.dependencies))).all()
+            data.dependencies = [get_task_by_code_or_id(session, dep) for dep in task.dependencies]
         except NoResultFound:
             raise HTTPException(status_code=404, detail="One or more dependencies not found")
     session.add(data)
