@@ -8,7 +8,7 @@ from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
 from fastapi import Path
 
 CodeOrID = Annotated[
-    str, Path(..., pattern=r"(REQ|DES|DEV|TES)-\d+$|^\d+", description="Task code (e.g., DEV-1) or ID (e.g., 1)")
+    str, Path(..., pattern=r"(REQ|DES|DEV|TES)-\d+$|^\d+", description="Task code (e.g., DEV-1) or ID (e.g., 1)", examples=["DEV-1", "TES-2", "REQ-15", "1"])
 ]
 
 # DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///:memory:")
