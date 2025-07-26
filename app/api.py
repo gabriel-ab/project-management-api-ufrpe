@@ -1,6 +1,5 @@
 import os
 from contextlib import asynccontextmanager
-from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,7 +136,7 @@ def update_case(id: int, data_update: CasePatch, session: Session = Depends(get_
 
 
 @app.delete("/case/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_case(id: UUID, session: Session = Depends(get_session)):
+def delete_case(id: int, session: Session = Depends(get_session)):
     "Apaga Caso de Uso"
     data = session.get(Case, id)
     if not data:
